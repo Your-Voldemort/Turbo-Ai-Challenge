@@ -12,6 +12,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.impute import SimpleImputer
 from xgboost import XGBClassifier
+from imblearn.over_sampling import SMOTE
+from imblearn.combine import SMOTETomek
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -20,7 +22,7 @@ class HotelDemandClassifier:
     AI model to predict hotel booking demand classification
     """
 
-    def __init__(self, use_grid_search=False):
+    def __init__(self, use_grid_search=False, use_smote=True, smote_strategy='auto'):
         self.imputer_num = SimpleImputer(strategy='median')
         self.imputer_cat = SimpleImputer(strategy='most_frequent')
         self.label_encoders = {}
@@ -28,6 +30,8 @@ class HotelDemandClassifier:
         self.model = None
         self.feature_names = None
         self.use_grid_search = use_grid_search
+        self.use_smote = use_smote
+        self.smote_strategy = smote_strategy
 
     def preprocess_data(self, df, is_training=True):
         """Preprocess the hotel booking data"""
@@ -69,13 +73,20 @@ class HotelDemandClassifier:
         # Additional feature engineering
         X['rate_per_night'] = X['avg_room_rate'] / (X['nights_stayed'] + 1)
         X['booking_value_per_person'] = X['total_booking_value'] / (X['people_count'] + 1)
-        X['lead_time_category'] = pd.cut(X['lead_time_days'], 
+        X['lead_time_category'] = pd.cut(X['lead_time_days'],
                                           bins=[-1, 7, 30, 90, 400],
                                           labels=['immediate', 'short', 'medium', 'long'])
         X['people_nights_interaction'] = X['people_count'] * X['nights_stayed']
         X['premium_loyalty'] = X['is_premium'] * X['loyalty_member']
         X['breakfast_value'] = X['has_breakfast_included'] * X['avg_room_rate']
         X['rating_value_ratio'] = X['rating_given'] * X['avg_room_rate'] / 1000
+
+        # More advanced feature engineering for accuracy boost
+        X['value_per_person_night'] = X['total_booking_value'] / ((X['people_count'] + 1) * (X['nights_stayed'] + 1))
+        X['rating_loyalty_interaction'] = X['rating_given'] * X['loyalty_member']
+        X['is_mid_range'] = ((X['avg_room_rate'] > 6000) & (X['avg_room_rate'] < 11000)).astype(int)
+        X['lead_time_squared'] = X['lead_time_days'] ** 2
+        X['avg_room_rate_squared'] = X['avg_room_rate'] ** 2
 
         # Encode categorical variables
         categorical_features.append('room_rate_category')
@@ -100,6 +111,19 @@ class HotelDemandClassifier:
         # Scale
         X_scaled = self.scaler.fit_transform(X_processed)
 
+        # Apply SMOTE for class imbalance
+        if self.use_smote:
+            print(f"Original class distribution: {np.bincount(y_train)}")
+
+            # Use SMOTETomek for better results (combines over-sampling and under-sampling)
+            smote_tomek = SMOTETomek(
+                smote=SMOTE(sampling_strategy=self.smote_strategy, random_state=42),
+                random_state=42
+            )
+            X_scaled, y_train = smote_tomek.fit_resample(X_scaled, y_train)
+
+            print(f"After SMOTE-Tomek class distribution: {np.bincount(y_train)}")
+
         if self.use_grid_search:
             # Grid search for best parameters
             param_grid = {
@@ -112,7 +136,7 @@ class HotelDemandClassifier:
             rf_base = RandomForestClassifier(
                 random_state=42,
                 n_jobs=-1,
-                class_weight='balanced_subsample'
+                class_weight='balanced' if not self.use_smote else None
             )
             
             grid_search = GridSearchCV(
@@ -125,15 +149,16 @@ class HotelDemandClassifier:
         else:
             # Use RandomForest with optimized parameters
             self.model = RandomForestClassifier(
-                n_estimators=600,
+                n_estimators=800,
                 max_depth=None,
                 min_samples_split=2,
                 min_samples_leaf=1,
                 max_features='sqrt',
                 bootstrap=True,
                 random_state=42,
-                class_weight='balanced_subsample',
-                n_jobs=-1
+                class_weight='balanced' if not self.use_smote else None,
+                n_jobs=-1,
+                criterion='entropy'
             )
             self.model.fit(X_scaled, y_train)
         
@@ -181,8 +206,8 @@ if __name__ == "__main__":
     )
 
     # Train model (set use_grid_search=True for hyperparameter tuning)
-    print("Training RandomForest model...")
-    classifier = HotelDemandClassifier(use_grid_search=False)
+    print("Training RandomForest model with SMOTE (0.7)...")
+    classifier = HotelDemandClassifier(use_grid_search=False, use_smote=True, smote_strategy=0.7)
     classifier.train(X_train, y_train)
 
     # Evaluate
@@ -192,4 +217,4 @@ if __name__ == "__main__":
     predictions = classifier.predict(X_test)
     probabilities = classifier.predict_proba(X_test)
     
-    print("\n✓ Model training complete!")
+    print("\nModel training complete!")
