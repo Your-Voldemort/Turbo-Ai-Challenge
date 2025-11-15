@@ -149,16 +149,17 @@ class HotelDemandClassifier:
         else:
             # Use RandomForest with optimized parameters
             self.model = RandomForestClassifier(
-                n_estimators=800,
+                n_estimators=1000,
                 max_depth=None,
                 min_samples_split=2,
                 min_samples_leaf=1,
                 max_features='sqrt',
                 bootstrap=True,
                 random_state=42,
-                class_weight='balanced' if not self.use_smote else None,
+                class_weight='balanced_subsample' if not self.use_smote else None,
                 n_jobs=-1,
-                criterion='entropy'
+                criterion='gini',
+                max_samples=0.8
             )
             self.model.fit(X_scaled, y_train)
         
@@ -206,8 +207,8 @@ if __name__ == "__main__":
     )
 
     # Train model (set use_grid_search=True for hyperparameter tuning)
-    print("Training RandomForest model with SMOTE (0.7)...")
-    classifier = HotelDemandClassifier(use_grid_search=False, use_smote=True, smote_strategy=0.7)
+    print("Training RandomForest model...")
+    classifier = HotelDemandClassifier(use_grid_search=False, use_smote=False)
     classifier.train(X_train, y_train)
 
     # Evaluate
