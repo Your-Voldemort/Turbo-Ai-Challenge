@@ -9,7 +9,7 @@
 
 HOTEL BOOKING DEMAND CLASSIFICATION
 
-#### Target Column: high_demand
+#### Target Column: strategic_family
 
 #### Question:
 
