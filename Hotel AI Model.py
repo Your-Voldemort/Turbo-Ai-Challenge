@@ -9,7 +9,8 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import LabelEncoder, StandardScaler, PowerTransformer
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier, AdaBoostClassifier, GradientBoostingClassifier
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier, AdaBoostClassifier, GradientBoostingClassifier, StackingClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.impute import SimpleImputer
 from xgboost import XGBClassifier
@@ -243,19 +244,19 @@ class HotelDemandClassifier:
                 thread_count=-1
             )
 
-            gb = GradientBoostingClassifier(
-                n_estimators=500,
-                learning_rate=0.05,
-                max_depth=5,
+            ada = AdaBoostClassifier(
+                n_estimators=300,
+                learning_rate=0.1,
                 random_state=42
             )
 
             self.model = VotingClassifier(
-                estimators=[('rf', rf), ('xgb', xgb), ('lgbm', lgbm), ('cb', cb), ('gb', gb)],
+                estimators=[('rf', rf), ('xgb', xgb), ('lgbm', lgbm), ('cb', cb), ('ada', ada)],
                 voting='soft',
-                weights=[1.5, 2.0, 1.5, 1.5, 1.2],
+                weights=[1.5, 2.2, 1.5, 1.5, 1.2],
                 n_jobs=-1
             )
+            self.model.fit(X_scaled, y_train)
             self.model.fit(X_scaled, y_train)
         else:
             # Use RandomForest with optimized parameters
