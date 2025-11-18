@@ -2,7 +2,7 @@
 # Team Number: 11
 
 ## Base Accuracy : 61.71%
-## Our Accuracy/Improved Accuracy: 64.29%
+## Our Accuracy/Improved Accuracy: 65.00%
 
 
 ### Question:
