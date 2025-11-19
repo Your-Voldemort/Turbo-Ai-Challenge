@@ -115,10 +115,18 @@ class HotelDemandClassifier:
         X['is_solo'] = (X['people_count'] == 1).astype(int)
         X['is_couple'] = (X['people_count'] == 2).astype(int)
         
+        # EVEN MORE FEATURES
+        X['log_total_value'] = np.log1p(X['total_booking_value'])
+        X['lead_time_weeks'] = X['lead_time_days'] // 7
+        X['interaction_country_room'] = X['customer_country'].astype(str) + '_' + X['room_type'].astype(str)
+        X['interaction_country_channel'] = X['customer_country'].astype(str) + '_' + X['booking_channel'].astype(str)
+
         # Encode categorical variables
         categorical_features.append('room_rate_category')
         categorical_features.append('lead_time_category')
         categorical_features.append('interaction_channel_lead')
+        categorical_features.append('interaction_country_room')
+        categorical_features.append('interaction_country_channel')
 
         if is_training:
             for col in categorical_features:
@@ -253,7 +261,7 @@ class HotelDemandClassifier:
             self.model = VotingClassifier(
                 estimators=[('rf', rf), ('xgb', xgb), ('lgbm', lgbm), ('cb', cb), ('ada', ada)],
                 voting='soft',
-                weights=[1.5, 2.2, 1.5, 1.5, 1.2],
+                weights=[1.5, 2.5, 1.5, 1.5, 1.2],
                 n_jobs=-1
             )
             self.model.fit(X_scaled, y_train)
